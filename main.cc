@@ -1,97 +1,59 @@
+// Note to self: I'm following the tutorial.
+// This is in C++, but it's gonna look very C-ish. I'm only applying synctactic sugar where needed
 #include <iostream>
 #include <string>
 
-void print_prompt(std::ostream &o)
+struct InputBuffer
 {
-    o << "enajDB > ";
+    std::string buffer;
+    size_t buffer_length;
+    ssize_t input_length; // ssize is typed
+    InputBuffer() : buffer(), buffer_length{0}, input_length{0} {};
+};
+
+InputBuffer new_input_buffer()
+{
+    return InputBuffer{};
 }
 
-typedef enum
+void print_prompt()
 {
-    STATEMENT_INSERT,
-    STATEMENT_SELECT,
-    STATEMENT_UNKNOWN
-} StatementType;
-
-typedef enum
-{
-    PREPARE_SUCCESS,
-    PREPARE_UNRECOGNIZED_STATEMENT
-} StatementPrepareResult;
-
-typedef struct
-{
-    StatementType type;
-} Statement;
-
-StatementPrepareResult prepare_statement(std::string &line, Statement &s)
-{
-    if (line.rfind("select", 0) == 0)
-    {
-        s.type = STATEMENT_SELECT;
-        return PREPARE_SUCCESS;
-    }
-    else if (line.rfind("insert", 0) == 0)
-    {
-        s.type = STATEMENT_INSERT;
-        return PREPARE_SUCCESS;
-    }
-    return PREPARE_UNRECOGNIZED_STATEMENT;
+    std::cout << "db > ";
 }
 
-void execute_statement(Statement *statement)
+void read_input(InputBuffer &input_buffer)
 {
-    switch (statement->type)
+    if (!std::getline(std::cin, input_buffer.buffer))
     {
-    case (STATEMENT_INSERT):
-        std::cout << "This is where we would do an insert" << std::endl;
-        break;
-    case (STATEMENT_SELECT):
-        std::cout << "This is where we would do a select" << std::endl;
-        break;
-    default:
-        std::cerr << "This should not be hit" << std::endl;
+        std::cerr << "Error reading input" << std::endl;
+        exit(EXIT_FAILURE);
     }
+
+    input_buffer.input_length = static_cast<ssize_t>(input_buffer.buffer.size());
+    input_buffer.buffer_length = input_buffer.buffer.size();
 }
 
-int main()
+void close_input_buffer(InputBuffer *input_buffer)
 {
-    std::string line;
-    std::cout << "Welcome to EnajDB!" << std::endl;
+    delete input_buffer;
+}
 
+int main(int argc, char *argv[])
+{
+    InputBuffer input_buffer = new_input_buffer();
     while (true)
     {
-        // Prompt
-        print_prompt(std::cout);
+        print_prompt();
+        read_input(input_buffer);
 
-        // Get input
-        if (!std::getline(std::cin, line))
+        if (input_buffer.buffer == ".exit")
         {
-            std::cout << "\nGoodbye!\n";
-            return 0;
+            // close_input_buffer(input_buffer);
+            exit(EXIT_SUCCESS);
         }
-
-        // If it's a meta command, run it
-        if (line == "quit")
+        else
         {
-            break;
+            std::cout << "Unrecognized command " << input_buffer.buffer << std::endl;
         }
-
-        // Validate the statement (compiler)
-        Statement statement;
-        switch (prepare_statement(line, statement))
-        {
-        case (PREPARE_SUCCESS):
-            break;
-        case (PREPARE_UNRECOGNIZED_STATEMENT):
-            std::cout << "Unrecognized statement: " << line << std::endl;
-            continue;
-        }
-
-        // Execute the statement
-        execute_statement(&statement);
     }
-
-    std::cout << "\nGoodbye!\n";
-    return 0;
 }
