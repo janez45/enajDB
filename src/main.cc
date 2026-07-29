@@ -142,10 +142,36 @@ Pager pager_open(const std::string &filename)
 // a table that holds the rows
 struct Table
 {
+    struct Cursor
+    {
+        uint32_t row_num;
+        bool end_of_table;
+        Table *table;
+
+        Cursor &operator++(int)
+        {
+            row_num++;
+            if (row_num >= table->num_rows)
+            {
+                end_of_table = true;
+            }
+            return *this;
+        }
+    };
     uint32_t num_rows;
     Pager pager;
     // TODO: I casted this
     Table(Pager pager) : num_rows{static_cast<uint32_t>(pager.file_length / ROW_SIZE)}, pager{std::move(pager)} {};
+
+    Cursor table_start()
+    {
+        return Cursor{0, num_rows == 0, this};
+    }
+
+    Cursor table_end()
+    {
+        return Cursor{num_rows, true, this};
+    }
 
     void db_close()
     {
@@ -207,10 +233,11 @@ void print_row(const Row &row)
 }
 
 // returns pointer to where row row_num exists on this table
-std::byte *row_slot(Table &table, uint32_t row_num)
+std::byte *cursor_value(const Table::Cursor &cursor)
 {
+    uint32_t row_num = cursor.row_num;
     uint32_t page_num = row_num / ROWS_PER_PAGE;
-    std::byte *page = table.pager.get_page(page_num);
+    std::byte *page = cursor.table->pager.get_page(page_num);
     uint32_t row_offset_on_page = row_num % ROWS_PER_PAGE; // this is the x*th row
     uint32_t byte_offset = row_offset_on_page * ROW_SIZE;
     return page + byte_offset;
@@ -326,7 +353,9 @@ ExecuteResult execute_insert(const Statement &statement, Table &table)
         return EXECUTE_TABLE_FULL;
     }
 
-    serialize_row(statement.row_to_insert, row_slot(table, table.num_rows));
+    Table::Cursor cursor = table.table_end(); // write to the end of the table
+
+    serialize_row(statement.row_to_insert, cursor_value(cursor));
     table.num_rows++;
 
     return EXECUTE_SUCCESS;
@@ -334,11 +363,13 @@ ExecuteResult execute_insert(const Statement &statement, Table &table)
 
 ExecuteResult execute_select(const Statement &statement, Table &table)
 {
+    Table::Cursor cursor = table.table_start();
     Row row;
-    for (int i = 0; i < table.num_rows; i++)
+    while (!(cursor.end_of_table))
     {
-        deserialize_row(row_slot(table, i), row);
+        deserialize_row(cursor_value(cursor), row);
         print_row(row);
+        cursor++;
     }
     return EXECUTE_SUCCESS;
 }
