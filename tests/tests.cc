@@ -8,6 +8,18 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <filesystem>
+
+static constexpr std::string testDbName = "test.db";
+
+class EnajDBTest : public ::testing::Test
+{
+protected:
+    void TearDown() override
+    {
+        std::filesystem::remove(testDbName);
+    }
+};
 
 struct ProcessResult
 {
@@ -43,7 +55,7 @@ ProcessResult run_script(const std::vector<std::string> &inputs)
         close(stdoutPipe[0]);
         close(stdoutPipe[1]);
 
-        execl("./build/enajDB", "./build/enajDB", nullptr); // change this to include inputs
+        execl("./build/enajDB", "./build/enajDB", testDbName.c_str(), nullptr); // change this to include inputs
 
         // this is only reached if exec fails
         exit(EXIT_FAILURE);
@@ -91,7 +103,7 @@ ProcessResult run_script(const std::vector<std::string> &inputs)
     return {exitCode, rawOutput};
 }
 
-TEST(EnajDB, InsertAndRetrievesRow)
+TEST_F(EnajDBTest, InsertAndRetrievesRow)
 {
     auto result = run_script({"insert 1 user1 person1@example.com",
                               "select",
@@ -104,7 +116,7 @@ TEST(EnajDB, InsertAndRetrievesRow)
         "db > ");
 }
 
-TEST(EnajDB, ErrorMessageTableFull)
+TEST_F(EnajDBTest, ErrorMessageTableFull)
 {
     std::vector<std::string> commands;
 
@@ -132,7 +144,7 @@ TEST(EnajDB, ErrorMessageTableFull)
               "db > Error: Table full.");
 }
 
-TEST(EnajDB, AllowMaxLengthStrings)
+TEST_F(EnajDBTest, AllowMaxLengthStrings)
 {
     std::string long_username(32, 'a');
     std::string long_email(255, 'a');
@@ -150,7 +162,7 @@ TEST(EnajDB, AllowMaxLengthStrings)
                     long_username, long_email));
 }
 
-TEST(EnajDB, ErrorUsernameTooLong)
+TEST_F(EnajDBTest, ErrorUsernameTooLong)
 {
     std::string long_username(33, 'a');
     std::string long_email(255, 'a');
@@ -166,7 +178,7 @@ TEST(EnajDB, ErrorUsernameTooLong)
         "db > ");
 }
 
-TEST(EnajDB, NoNegativeIds)
+TEST_F(EnajDBTest, NoNegativeIds)
 {
     std::vector<std::string> commands = {
         "insert -1 user1 user1@example.com",
@@ -180,7 +192,7 @@ TEST(EnajDB, NoNegativeIds)
         "db > ");
 }
 
-TEST(EnajDB, KeepsDataAfterClosingConnection)
+TEST_F(EnajDBTest, KeepsDataAfterClosingConnection)
 {
     std::vector<std::string> commands1 = {
         "insert 1 user1 user1@example.com",
@@ -199,7 +211,7 @@ TEST(EnajDB, KeepsDataAfterClosingConnection)
     result = run_script(commands2);
     EXPECT_EQ(
         result.stdout,
-        "db > (1, user1, person1@example.com)\n"
+        "db > (1, user1, user1@example.com)\n"
         "Executed.\n"
         "db > ");
 }
