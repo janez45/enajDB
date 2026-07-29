@@ -78,3 +78,5 @@ select u1:User where
         && m1.uid = u1.uid
         && m2.uid = l.uid
 ```
+
+enajDB is super code - like and uses proof-like syntax. it's inspired by the way I used to use mathematical proof syntax to understand SQL and push out queries.

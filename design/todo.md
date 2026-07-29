@@ -1,0 +1,3 @@
+- What if you kill the program using SIGTERM?
+- Needs proper restructuring after the tutorial
+- Tests are broken afterwards. Probably a good idea to tweak them to create dbs and then delete right after

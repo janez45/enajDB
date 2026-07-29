@@ -4,6 +4,10 @@
 #include <cstdio>
 #include <stdexcept>
 #include <format>
+#include <sstream>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/types.h>
 
 struct ProcessResult
 {
@@ -173,5 +177,29 @@ TEST(EnajDB, NoNegativeIds)
         result.stdout,
         "db > ID must be positive.\n"
         "db > Executed.\n"
+        "db > ");
+}
+
+TEST(EnajDB, KeepsDataAfterClosingConnection)
+{
+    std::vector<std::string> commands1 = {
+        "insert 1 user1 user1@example.com",
+        ".exit"};
+
+    auto result = run_script(commands1);
+    EXPECT_EQ(
+        result.stdout,
+        "db > Executed.\n"
+        "db > ");
+
+    std::vector<std::string> commands2 = {
+        "select",
+        ".exit"};
+
+    result = run_script(commands2);
+    EXPECT_EQ(
+        result.stdout,
+        "db > (1, user1, person1@example.com)\n"
+        "Executed.\n"
         "db > ");
 }

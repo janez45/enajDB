@@ -5,6 +5,12 @@
 #include <sstream>
 #include <cstring>
 #include <vector>
+#include <fstream>
+
+#include <fcntl.h>     // Required for open() and flags (like O_RDONLY, O_CREAT)
+#include <sys/types.h> // Required for historical portability and type definitions
+#include <sys/stat.h>  // Required if you use mode flags when creating files
+#include <unistd.h>    // Required for lseek()
 
 static constexpr int COLUMN_USERNAME_SIZE = 32;
 static constexpr int COLUMN_EMAIL_SIZE = 255;
@@ -37,14 +43,149 @@ static constexpr int TABLE_MAX_PAGES = 100; // arbitrary limit for now
 const uint32_t ROWS_PER_PAGE = PAGE_SIZE / ROW_SIZE;
 const uint32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES;
 
+// pager accesses the page cache and the file
+struct Pager
+{
+    int fd;
+    off_t file_length;
+    std::vector<std::byte *> pages;
+    Pager(int fd, off_t file_length) : fd{fd}, file_length{file_length}, pages{std::vector<std::byte *>(TABLE_MAX_PAGES, nullptr)} {}
+    ~Pager()
+    {
+        for (std::byte *page : pages)
+        {
+            delete[] page;
+        }
+    }
+    std::byte *get_page(uint32_t page_num)
+    {
+        if (page_num > TABLE_MAX_PAGES)
+        {
+            std::cerr << "Tried to fetch page number out of bounds. " << page_num << " > " << TABLE_MAX_PAGES << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        // cache miss. Allocate memory and load from file
+        if (pages[page_num] == nullptr)
+        {
+            std::byte *page = new std::byte[PAGE_SIZE];   // this could memory leak
+            uint32_t num_pages = file_length / PAGE_SIZE; // how many pages are there in total in this table?
+
+            // there is one more page, a partial one at the end of the file
+            if (file_length % PAGE_SIZE)
+            {
+                num_pages++;
+            }
+
+            if (page_num <= num_pages)
+            {
+                lseek(fd, page_num * PAGE_SIZE, SEEK_SET);
+                ssize_t bytes_read = read(fd, page, PAGE_SIZE); // read into the pager
+                if (bytes_read == -1)
+                {
+                    std::cerr << "Error reading file: " << errno << std::endl;
+                    exit(EXIT_FAILURE);
+                }
+            }
+            pages[page_num] = page;
+        }
+
+        return pages[page_num];
+    }
+
+    // Size is needed in case we need to flush a partial page
+    void flush(uint32_t page_num, uint32_t size)
+    {
+        if (pages[page_num] == nullptr)
+        {
+            std::cerr << "Tried to flush null page" << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        off_t offset = lseek(fd, page_num * PAGE_SIZE, SEEK_SET);
+        if (offset == -1)
+        {
+            std::cerr << "Error seeing: " << errno << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        ssize_t bytes_written = write(fd, pages[page_num], size);
+        if (bytes_written == -1)
+        {
+            std::cerr << "Error writing: " << errno << std::endl;
+            exit(EXIT_FAILURE);
+        }
+    }
+};
+
+// TODO: Should this be ptr or object?
+Pager pager_open(const std::string &filename)
+{
+    // open the file in read/write mode. Create if not existing
+    // Add read / write permissions for the user if creating this file
+    int fd = open(filename.c_str(), O_RDWR | O_CREAT, S_IWUSR | S_IRUSR);
+
+    if (fd == -1)
+    {
+        std::cout << "Unable to open file" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    // position right at the end. You add the zero from there
+    // opposite of SEEK_END is SEEK_SET
+    // in bytes
+    off_t file_length = lseek(fd, 0, SEEK_END);
+    Pager pager{fd, file_length};
+    return pager;
+}
+
 // a table that holds the rows
 struct Table
 {
     uint32_t num_rows;
-    std::vector<std::byte *> pages;
+    Pager pager;
+    // TODO: I casted this
+    Table(Pager pager) : num_rows{static_cast<uint32_t>(pager.file_length / ROW_SIZE)}, pager{std::move(pager)} {};
 
-    Table() : num_rows{0}, pages{std::vector<std::byte *>(TABLE_MAX_PAGES, nullptr)} {};
+    void db_close()
+    {
+        uint32_t num_full_pages = num_rows / ROWS_PER_PAGE;
+
+        for (uint32_t i = 0; i < num_full_pages; i++)
+        {
+            if (pager.pages[i] == nullptr)
+            {
+                continue;
+            }
+            pager.flush(i, PAGE_SIZE);
+            delete[] pager.pages[i];
+            pager.pages[i] = nullptr;
+        }
+
+        // is there an extra page?
+        uint32_t num_additional_rows = num_rows % ROWS_PER_PAGE;
+        if (num_additional_rows)
+        {
+            uint32_t page_num = num_full_pages;
+            pager.flush(page_num, num_additional_rows * ROW_SIZE);
+            delete[] pager.pages[page_num];
+            pager.pages[page_num] = nullptr;
+        }
+
+        int result = close(pager.fd);
+        if (result == -1)
+        {
+            std::cerr << "Error closing db file." << std::endl;
+            exit(EXIT_FAILURE);
+        }
+    }
 };
+
+Table db_open(const std::string &filename)
+{
+    Pager pager = pager_open(filename);
+    return Table{pager};
+}
 
 void serialize_row(const Row &row, std::byte *destination)
 {
@@ -69,13 +210,10 @@ void print_row(const Row &row)
 std::byte *row_slot(Table &table, uint32_t row_num)
 {
     uint32_t page_num = row_num / ROWS_PER_PAGE;
-    if (table.pages[page_num] == nullptr)
-    {
-        table.pages[page_num] = new std::byte[PAGE_SIZE]();
-    }
+    std::byte *page = table.pager.get_page(page_num);
     uint32_t row_offset_on_page = row_num % ROWS_PER_PAGE; // this is the x*th row
     uint32_t byte_offset = row_offset_on_page * ROW_SIZE;
-    return table.pages[page_num] + byte_offset;
+    return page + byte_offset;
 }
 
 struct InputBuffer
@@ -124,10 +262,11 @@ InputBuffer new_input_buffer()
     return InputBuffer{};
 }
 
-MetaCommandResult do_meta_command(const InputBuffer &input_buffer)
+MetaCommandResult do_meta_command(const InputBuffer &input_buffer, Table &table)
 {
     if (input_buffer.buffer == ".exit")
     {
+        table.db_close();
         exit(EXIT_SUCCESS);
     }
     else
@@ -239,7 +378,14 @@ void close_input_buffer(InputBuffer *input_buffer)
 
 int main(int argc, char *argv[])
 {
-    Table table{};
+    if (argc < 2)
+    {
+        std::cerr << "Must supply a database filename" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    std::string filename = argv[1];
+    Table table = db_open(filename);
     InputBuffer input_buffer = new_input_buffer();
     while (true)
     {
@@ -248,7 +394,7 @@ int main(int argc, char *argv[])
 
         if (input_buffer.buffer[0] == '.')
         {
-            switch (do_meta_command(input_buffer))
+            switch (do_meta_command(input_buffer, table))
             {
             case (META_COMMAND_SUCCESS):
                 continue;
