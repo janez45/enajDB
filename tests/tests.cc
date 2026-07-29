@@ -3,6 +3,7 @@
 #include <string>
 #include <cstdio>
 #include <stdexcept>
+#include <format>
 
 enum EXIT_CODE
 {
@@ -44,7 +45,7 @@ ProcessResult run_script(const std::vector<std::string> &inputs)
         close(stdoutPipe[0]);
         close(stdoutPipe[1]);
 
-        execl("./enajDB", "./enajDB", nullptr); // change this to include inputs
+        execl("./build/enajDB", "./build/enajDB", nullptr); // change this to include inputs
 
         // this is only reached if exec fails
         exit(EXIT_FAILURE);
@@ -102,5 +103,81 @@ TEST(EnajDB, InsertAndRetrievesRow)
         "db > Executed.\n"
         "db > (1, user1, person1@example.com)\n"
         "Executed.\n"
+        "db > ");
+}
+
+TEST(EnajDB, ErrorMessageTableFull)
+{
+    std::vector<std::string> commands;
+
+    // 100 pages per table, 14 rows per page
+    for (int i = 1; i <= 1401; i++)
+    {
+        std::string command = std::format("insert {} user{} person{}@example.com", i, i, i);
+        commands.push_back(command);
+    }
+    commands.push_back(".exit");
+    auto result = run_script(commands);
+
+    std::vector<std::string> lines;
+    std::stringstream ss(result.stdout);
+    std::string line;
+
+    while (std::getline(ss, line))
+    {
+        lines.push_back(line);
+    }
+
+    ASSERT_GE(lines.size(), 2);
+
+    EXPECT_EQ(lines[lines.size() - 2],
+              "db > Error: Table full.");
+}
+
+TEST(EnajDB, AllowMaxLengthStrings)
+{
+    std::string long_username(32, 'a');
+    std::string long_email(255, 'a');
+    std::vector<std::string> commands = {
+        std::format("insert 1 {} {}", long_username, long_email),
+        "select",
+        ".exit"};
+    auto result = run_script(commands);
+    EXPECT_EQ(
+        result.stdout,
+        std::format("db > Executed.\n"
+                    "db > (1, {}, {})\n"
+                    "Executed.\n"
+                    "db > ",
+                    long_username, long_email));
+}
+
+TEST(EnajDB, ErrorUsernameTooLong)
+{
+    std::string long_username(33, 'a');
+    std::string long_email(255, 'a');
+    std::vector<std::string> commands = {
+        std::format("insert 1 {} {}", long_username, long_email),
+        "select",
+        ".exit"};
+    auto result = run_script(commands);
+    EXPECT_EQ(
+        result.stdout,
+        "db > String is too long.\n"
+        "db > Executed.\n"
+        "db > ");
+}
+
+TEST(EnajDB, NoNegativeIds)
+{
+    std::vector<std::string> commands = {
+        "insert -1 user1 user1@example.com",
+        "select",
+        ".exit"};
+    auto result = run_script(commands);
+    EXPECT_EQ(
+        result.stdout,
+        "db > ID must be positive.\n"
+        "db > Executed.\n"
         "db > ");
 }

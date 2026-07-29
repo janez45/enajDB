@@ -18,8 +18,8 @@ static constexpr size_t size_of_attribute(Attribute Struct::*)
 struct Row
 {
     uint32_t id;
-    char username[COLUMN_USERNAME_SIZE];
-    char email[COLUMN_EMAIL_SIZE];
+    char username[COLUMN_USERNAME_SIZE + 1];
+    char email[COLUMN_EMAIL_SIZE + 1];
 };
 
 const uint32_t ID_SIZE = size_of_attribute(&Row::id);
@@ -95,6 +95,8 @@ enum MetaCommandResult
 enum PrepareResult
 {
     PREPARE_SUCCESS,
+    PREPARE_NEGATIVE_ID,
+    PREPARE_STRING_TOO_LONG,
     PREPARE_UNRECOGNIZED_STATEMENT,
     PREPARE_SYNTAX_ERROR
 };
@@ -134,6 +136,31 @@ MetaCommandResult do_meta_command(const InputBuffer &input_buffer)
     }
 }
 
+PrepareResult prepare_insert(std::istream &inputStream, Statement &statement)
+{
+    statement.type = STATEMENT_INSERT;
+    int id;
+    std::string username;
+    std::string email;
+    if (!(inputStream >> id >> username >> email))
+    {
+        return PREPARE_SYNTAX_ERROR;
+    }
+    if (id < 0)
+    {
+        return PREPARE_NEGATIVE_ID;
+    }
+    if (username.size() > COLUMN_USERNAME_SIZE || username.size() > COLUMN_EMAIL_SIZE)
+    {
+        return PREPARE_STRING_TOO_LONG;
+    }
+    statement.row_to_insert.id = id;
+    std::strcpy(statement.row_to_insert.username, username.c_str());
+    std::strcpy(statement.row_to_insert.email, email.c_str());
+
+    return PREPARE_SUCCESS;
+}
+
 PrepareResult prepare_statement(const InputBuffer &input_buffer, Statement &statement)
 {
     std::istringstream inputStream(input_buffer.buffer);
@@ -142,14 +169,7 @@ PrepareResult prepare_statement(const InputBuffer &input_buffer, Statement &stat
     inputStream >> command;
     if (command == "insert")
     {
-        statement.type = STATEMENT_INSERT;
-        // TODO: basic scanning of the statement inserting. This is very finnicky though, I might do some C++ magic on this
-        if (!(inputStream >> statement.row_to_insert.id >> statement.row_to_insert.username >> statement.row_to_insert.email))
-        {
-            return PREPARE_SYNTAX_ERROR; // too little
-        }
-
-        return PREPARE_SUCCESS;
+        return prepare_insert(inputStream, statement);
     }
     else if (command == "select")
     {
@@ -243,6 +263,12 @@ int main(int argc, char *argv[])
         {
         case (PREPARE_SUCCESS):
             break;
+        case (PREPARE_NEGATIVE_ID):
+            std::cout << "ID must be positive." << std::endl;
+            continue;
+        case (PREPARE_STRING_TOO_LONG):
+            std::cout << "String is too long." << std::endl;
+            continue;
         case (PREPARE_SYNTAX_ERROR):
             std::cout << "Syntax error. Could not parse statement." << std::endl;
             continue;
