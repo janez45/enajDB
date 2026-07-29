@@ -5,12 +5,6 @@
 #include <stdexcept>
 #include <format>
 
-enum EXIT_CODE
-{
-    SUCCESS,
-    FAIL
-};
-
 struct ProcessResult
 {
     int exitCode;
