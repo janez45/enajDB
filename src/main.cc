@@ -15,6 +15,12 @@
 static constexpr int COLUMN_USERNAME_SIZE = 32;
 static constexpr int COLUMN_EMAIL_SIZE = 255;
 
+// gets the size of the type of some member
+// Struct::* is a member of the class. Say id in row for example
+// Attribute is thus the type. So Attribute = int, Struct:: = a member inside Struct::
+// Then it returns the sizeof(int)
+// Attribute Struct::* essentially is "pointer to a member of Struct whose type is Attribute"
+// using pointers because we don't need the value of a concrete object, we just need the size
 template <typename Struct, typename Attribute>
 static constexpr size_t size_of_attribute(Attribute Struct::*)
 {
