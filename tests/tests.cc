@@ -55,7 +55,7 @@ ProcessResult run_script(const std::vector<std::string> &inputs)
         close(stdoutPipe[0]);
         close(stdoutPipe[1]);
 
-        execl("./build/enajDB", "./build/enajDB", testDbName.c_str(), nullptr); // change this to include inputs
+        execl("./build/enajDB", "./build/enajDB", testDbName.c_str(), nullptr);
 
         // this is only reached if exec fails
         exit(EXIT_FAILURE);
