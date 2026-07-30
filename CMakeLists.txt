@@ -15,6 +15,9 @@ add_compile_options(
 add_executable(
     enajDB
     src/main.cc
+    src/pager.cc
+    src/table.cc 
+    src/utils.cc
 )
 
 # Fetch GoogleTest framework
