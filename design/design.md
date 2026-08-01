@@ -79,4 +79,4 @@ select u1:User where
         && m2.uid = l.uid
 ```
 
-enajDB is super code - like and uses proof-like syntax. it's inspired by the way I used to use mathematical proof syntax to understand SQL and push out queries.
+enajDB's syntax probably looks more like programming language than relational algebra and uses proof-like syntax. it's inspired by the way I used to use mathematical proof syntax to understand SQL and push out queries.

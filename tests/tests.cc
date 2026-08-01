@@ -67,7 +67,7 @@ ProcessResult run_script(const std::vector<std::string> &inputs)
     std::vector<std::string> outputs;
     for (const std::string &input : inputs)
     {
-        // OPTIMIZATION: Beware partial writes
+        // OPTIMIZATION: Beware partial writes or stdin buffer overflow
         write(stdinPipe[1], input.data(), input.size());
         write(stdinPipe[1], "\n", 1);
     }

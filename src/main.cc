@@ -77,7 +77,10 @@ int main(int argc, char *argv[])
     }
 
     std::string filename = argv[1];
-    Table table = db_open(filename);
+
+    // This should be db_open
+    Pager pager = Pager::pager_open(filename);
+    Table table = Table{pager};
     InputBuffer input_buffer = new_input_buffer();
     while (true)
     {

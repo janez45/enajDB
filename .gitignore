@@ -54,6 +54,9 @@ Makefile
 enajDB
 *.out
 
+# databases
+*.db
+
 # OS / editor noise (Mac)
 .DS_Store
 

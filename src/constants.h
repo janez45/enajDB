@@ -24,20 +24,19 @@ struct Row
     char email[COLUMN_EMAIL_SIZE + 1];
 };
 
-const uint32_t ID_SIZE = size_of_attribute(&Row::id);
-const uint32_t USERNAME_SIZE = size_of_attribute(&Row::username);
-const uint32_t EMAIL_SIZE = size_of_attribute(&Row::email);
-const uint32_t ID_OFFSET = 0;
-const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
-const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
-const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
+static constexpr size_t ID_SIZE = size_of_attribute(&Row::id);
+static constexpr size_t USERNAME_SIZE = size_of_attribute(&Row::username);
+static constexpr size_t EMAIL_SIZE = size_of_attribute(&Row::email);
+static constexpr size_t ID_OFFSET = 0;
+static constexpr size_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
+static constexpr size_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
+static constexpr size_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE; // WILL NOT EXCEED PAGE_SIZE FOR V1
 
-// table has page, page has rows
-const uint32_t PAGE_SIZE = 4096;            // same size as page in most OS systems
+static constexpr size_t PAGE_SIZE = 4096;   // same size as page in most OS systems
 static constexpr int TABLE_MAX_PAGES = 100; // arbitrary limit for now
 
-const uint32_t ROWS_PER_PAGE = PAGE_SIZE / ROW_SIZE;
-const uint32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES;
+static constexpr size_t ROWS_PER_PAGE = PAGE_SIZE / ROW_SIZE;
+static constexpr size_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES; // TODO: This could change depending on how much metadata
 
 // enums
 enum MetaCommandResult
