@@ -4,7 +4,7 @@ GOAL: Single user connection, single database, multiple tables, index support, q
 
 NOW
 │
-├── [1] Refactor Pager
+├── [1] Refactor Pager (DONE, NEED PAGER TESTS)
 │ ├── PageId
 │ ├── Page
 │ ├── open()
@@ -12,6 +12,14 @@ NOW
 │ ├── allocate_page()
 │ ├── flush()
 │ └── persistence tests - No memory leak
+
+- Pager tests
+- Writing tests
+  - Attempting to read/write on a nonexistent row
+  - Attempting to get an invalid page
+  - Correct file size
+  - Reading and Writing across pages
+
 │
 ├── [2] Replace fixed Row
 │ ├── Type

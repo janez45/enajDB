@@ -12,13 +12,34 @@ add_compile_options(
     -g
 )
 
+# ----------------
+# EnajDB library
+# ----------------
+
+add_library(enajDB_lib
+    src/pager.cc
+    src/table.cc
+    src/utils.cc
+)
+
+# Headers exposed by enajDB_lib.
+target_include_directories(
+    enajDB_lib
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# ----------------
+# EnajDB executable
+# ----------------
 add_executable(
     enajDB
     src/main.cc
-    src/pager.cc
-    src/table.cc 
-    src/utils.cc
 )
+
+# link the enajDB_lib, but if any executable links against enajDB, 
+# they do not inherit enajDB_lib
+target_link_libraries(enajDB PRIVATE enajDB_lib)
 
 # Fetch GoogleTest framework
 include(FetchContent)
@@ -28,17 +49,8 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-# Enable CTest infrastructure
+# Enable ctest, which organizes/discovers/runs tests from CMake
 enable_testing()
 
-add_executable(
-    tests 
-    tests/tests.cc
-)
-
-target_link_libraries(tests
-    GTest::gtest_main
-)
-
-include(GoogleTest)
-gtest_discover_tests(tests)
+# Let tests/CMakeLists.txt define the test executables.
+add_subdirectory(tests)
