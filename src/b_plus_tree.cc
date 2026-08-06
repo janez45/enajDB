@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <stack>
 #include <cassert>
+#include <memory>
 
 BPlusTree::BPlusTree(size_t fanout) : fanout{fanout}, root{nullptr}
 {
@@ -9,11 +10,6 @@ BPlusTree::BPlusTree(size_t fanout) : fanout{fanout}, root{nullptr}
     {
         throw std::invalid_argument("B+ tree fanout must be at least 2");
     }
-}
-
-BPlusTree::~BPlusTree()
-{
-    delete root;
 }
 
 [[noreturn]] void unreachable()
@@ -44,7 +40,7 @@ BPlusTree::LeafNode *BPlusTree::search(Node *cur, int key, std::stack<Node *> *s
         // internal
         auto it = std::upper_bound(internal_node->keys.begin(), internal_node->keys.end(), key);
         int index = it - internal_node->keys.begin(); // largest pointer would result in .end()
-        return BPlusTree::search(internal_node->children[index], key, stack);
+        return BPlusTree::search(internal_node->children[index].get(), key, stack);
     }
     unreachable();
 }
@@ -58,7 +54,7 @@ std::vector<std::pair<int, int>> BPlusTree::range_query_inclusive(int low, int h
         return {};
     }
 
-    LeafNode *leaf_node = search(root, low);
+    LeafNode *leaf_node = search(root.get(), low);
     int index = std::lower_bound(leaf_node->keys.begin(), leaf_node->keys.end(), low) - leaf_node->keys.begin();
     std::vector<std::pair<int, int>> ans;
 
@@ -84,7 +80,7 @@ bool BPlusTree::empty() const
 // Precondition: This is already full and the key + pointer is already inserted, so this is a bloated node
 BPlusTree::SplitResult BPlusTree::split_leaf_node(LeafNode *leafNode)
 {
-    LeafNode *right = new LeafNode;
+    auto right = std::make_unique<LeafNode>();
 
     const int mid = leafNode->keys.size() / 2;
 
@@ -97,40 +93,41 @@ BPlusTree::SplitResult BPlusTree::split_leaf_node(LeafNode *leafNode)
     leafNode->values.erase(leafNode->values.begin() + mid, leafNode->values.end());
 
     right->next = leafNode->next;
-    leafNode->next = right;
+    leafNode->next = right.get();
 
-    return {.separator = right->keys.front(), .right = right};
+    return {.separator = right->keys.front(), .right = std::move(right)};
 }
 
 // Note: This can only be hit after a leaf node is hit first. This node must be bloated (children.size() = fanout + 1) first
 BPlusTree::SplitResult BPlusTree::split_internal_node(InternalNode *internalNode)
 {
-    InternalNode *right = new InternalNode;
+    auto right = std::make_unique<InternalNode>();
 
     const int mid = internalNode->keys.size() / 2;
 
     // assign to right
     right->keys.assign(internalNode->keys.begin() + mid + 1, internalNode->keys.end()); // mid is not captured
-    right->children.assign(internalNode->children.begin() + mid + 1, internalNode->children.end());
+    right->children.assign(std::make_move_iterator(internalNode->children.begin() + mid + 1),
+                           std::make_move_iterator(internalNode->children.end()));
 
     internalNode->keys.erase(internalNode->keys.begin() + mid, internalNode->keys.end());
     internalNode->children.erase(internalNode->children.begin() + mid + 1, internalNode->children.end());
 
-    return {.separator = right->keys.front(), .right = right};
+    return {.separator = right->keys.front(), .right = std::move(right)};
 }
 
 void BPlusTree::insert_key(int key, int value)
 {
     std::stack<Node *> stack; // top should be leafnode, rest internal
-    search(root, key, &stack);
+    search(root.get(), key, &stack);
 
     // the root is empty
     if (stack.empty())
     {
-        LeafNode *newRoot = new LeafNode;
+        auto newRoot = std::make_unique<LeafNode>();
         newRoot->keys = {key};
         newRoot->values = {value};
-        root = newRoot;
+        root = std::move(newRoot);
         return;
     }
 
@@ -166,7 +163,7 @@ void BPlusTree::insert_key(int key, int value)
             // insert into parent
             int insertionIndex = std::upper_bound(internal_node->keys.begin(), internal_node->keys.end(), splitResult.separator) - internal_node->keys.begin();
             internal_node->keys.insert(internal_node->keys.begin() + insertionIndex, splitResult.separator);
-            internal_node->children.insert(internal_node->children.begin() + insertionIndex + 1, splitResult.right);
+            internal_node->children.insert(internal_node->children.begin() + insertionIndex + 1, std::move(splitResult.right));
 
             if (internal_node->keys.size() < fanout)
             {
@@ -182,10 +179,11 @@ void BPlusTree::insert_key(int key, int value)
     // it split all the way up to the root
     if (!complete)
     {
-        InternalNode *newRoot = new InternalNode;
+        auto newRoot = std::make_unique<InternalNode>();
         newRoot->keys = {splitResult.separator};
-        newRoot->children = {cur, splitResult.right};
-        root = newRoot;
+        newRoot->children.push_back(std::move(root));
+        newRoot->children.push_back(std::move(splitResult.right));
+        root = std::move(newRoot);
     }
 }
 
