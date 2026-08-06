@@ -13,34 +13,34 @@ NOW
 │ ├── flush()
 │ └── persistence tests - No memory leak
 
-- Pager tests
-- Writing tests
-  - Attempting to read/write on a nonexistent row
-  - Attempting to get an invalid page
-  - Correct file size
-  - Reading and Writing across pages
+- PAGER IS DONE!!
+  │
+  ├── [2] Replace fixed Row
+  │ ├── Type
+  │ ├── Value
+  │ ├── Column
+  │ ├── Schema
+  │ └── Row
+  │
+  - Table tests
+    - Attempting to read/write on a nonexistent row
+    - Attempting to get an invalid page
+    - Correct file size
+    - Reading and Writing across pages
 
-│
-├── [2] Replace fixed Row
-│ ├── Type
-│ ├── Value
-│ ├── Column
-│ ├── Schema
-│ └── Row
-│
-├── [3] Generic serialization
-│
-├── [4] In-memory B+ tree
-│
-├── [5] Persistent B+ tree
-│
-└── [6] THEN introduce Database + Catalog
-│
-├── CREATE TABLE
-├── DROP TABLE
-├── OPEN TABLE
-├── multiple schemas
-└── multiple B+ tree roots
+  ├── [3] Generic serialization
+  │
+  ├── [4] In-memory B+ tree
+  │
+  ├── [5] Persistent B+ tree
+  │
+  └── [6] THEN introduce Database + Catalog
+  │
+  ├── CREATE TABLE
+  ├── DROP TABLE
+  ├── OPEN TABLE
+  ├── multiple schemas
+  └── multiple B+ tree roots
 
 What will make enajDB unique?
 

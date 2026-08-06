@@ -13,6 +13,24 @@ add_compile_options(
 )
 
 # ----------------
+# Sanitizers
+# ----------------
+
+option(ENABLE_ASAN "Enable AddressSanitizer and LeakSanitizer" OFF)
+
+if(ENABLE_ASAN)
+    add_compile_options(
+        -fsanitize=address
+        -fno-omit-frame-pointer
+    )
+
+    add_link_options(
+        -fsanitize=address
+    )
+endif()
+
+
+# ----------------
 # EnajDB library
 # ----------------
 
@@ -20,6 +38,7 @@ add_library(enajDB_lib
     src/pager.cc
     src/table.cc
     src/utils.cc
+    src/b_plus_tree.cc
 )
 
 # Headers exposed by enajDB_lib.

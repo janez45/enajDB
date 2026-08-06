@@ -43,6 +43,8 @@
 # Build directories
 build/*
 cmake-build-*/
+build-asan/*
+cmake-build-asan/*
 
 # CMake generated files
 CMakeCache.txt

@@ -32,6 +32,21 @@ target_link_libraries(
 
 gtest_discover_tests(table_test)
 
+# B+ tree unit tests
+add_executable(
+    b_plus_tree_test
+    b_plus_tree/b_plus_tree_test.cc
+)
+
+target_link_libraries(
+    b_plus_tree_test
+    PRIVATE
+        enajDB_lib
+        GTest::gtest_main
+)
+
+gtest_discover_tests(b_plus_tree_test)
+
 
 # End-to-end tests
 add_executable(

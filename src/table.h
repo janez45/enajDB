@@ -10,6 +10,7 @@ class Table
 private:
     uint32_t num_rows;
     Pager &pager;
+    // Later on, this must own the first B+ tree node
 
     ExecuteResult execute_insert(const Statement &statement);
     ExecuteResult execute_select(const Statement &statement);
