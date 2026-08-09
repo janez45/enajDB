@@ -3,12 +3,14 @@
 #include <stack>
 #include <cassert>
 #include <memory>
+#include <iostream>
+#include <sstream>
 
-BPlusTree::BPlusTree(size_t fanout) : fanout{fanout}, root{nullptr}
+BPlusTree::BPlusTree(size_t fanout) : size_{0}, fanout{fanout}, root{nullptr}
 {
     if (fanout < 3)
     {
-        throw std::invalid_argument("B+ tree fanout must be at least 2");
+        throw std::invalid_argument("B+ tree fanout must be at least 3");
     }
 }
 
@@ -104,6 +106,7 @@ BPlusTree::SplitResult BPlusTree::split_internal_node(InternalNode *internalNode
     auto right = std::make_unique<InternalNode>();
 
     const int mid = internalNode->keys.size() / 2;
+    const int separator = internalNode->keys[mid];
 
     // assign to right
     right->keys.assign(internalNode->keys.begin() + mid + 1, internalNode->keys.end()); // mid is not captured
@@ -113,20 +116,33 @@ BPlusTree::SplitResult BPlusTree::split_internal_node(InternalNode *internalNode
     internalNode->keys.erase(internalNode->keys.begin() + mid, internalNode->keys.end());
     internalNode->children.erase(internalNode->children.begin() + mid + 1, internalNode->children.end());
 
-    return {.separator = right->keys.front(), .right = std::move(right)};
+    return {.separator = separator, .right = std::move(right)};
 }
 
-void BPlusTree::insert_key(int key, int value)
+// TODO: Keys are unique for now.
+// If you try to hit a key that already exists, it throws an error
+void BPlusTree::insert_key(int key, int recordId)
 {
+    size_++;
     std::stack<Node *> stack; // top should be leafnode, rest internal
-    search(root.get(), key, &stack);
+    BPlusTree::LeafNode *targetLeaf = search(root.get(), key, &stack);
+
+    // will never be empty so long as this is valid
+    if (targetLeaf)
+    {
+        auto it = std::lower_bound(targetLeaf->keys.begin(), targetLeaf->keys.end(), key);
+        if (it != targetLeaf->keys.end() && *it == key)
+        {
+            throw std::invalid_argument(std::format("Cannot insert duplicate key: {}", key));
+        }
+    }
 
     // the root is empty
     if (stack.empty())
     {
         auto newRoot = std::make_unique<LeafNode>();
         newRoot->keys = {key};
-        newRoot->values = {value};
+        newRoot->values = {recordId};
         root = std::move(newRoot);
         return;
     }
@@ -147,9 +163,9 @@ void BPlusTree::insert_key(int key, int value)
         {
             int insertionIndex = std::upper_bound(leaf_node->keys.begin(), leaf_node->keys.end(), key) - leaf_node->keys.begin();
             leaf_node->keys.insert(leaf_node->keys.begin() + insertionIndex, key);
-            leaf_node->values.insert(leaf_node->values.begin() + insertionIndex, value);
+            leaf_node->values.insert(leaf_node->values.begin() + insertionIndex, recordId);
 
-            if (leaf_node->keys.size() < fanout)
+            if (leaf_node->values.size() <= fanout)
             {
                 complete = true;
             }
@@ -165,7 +181,7 @@ void BPlusTree::insert_key(int key, int value)
             internal_node->keys.insert(internal_node->keys.begin() + insertionIndex, splitResult.separator);
             internal_node->children.insert(internal_node->children.begin() + insertionIndex + 1, std::move(splitResult.right));
 
-            if (internal_node->keys.size() < fanout)
+            if (internal_node->children.size() <= fanout)
             {
                 complete = true;
             }
@@ -189,4 +205,175 @@ void BPlusTree::insert_key(int key, int value)
 
 void BPlusTree::delete_key(int key)
 {
+    size_--;
+}
+
+void BPlusTree::LeafNode::output(std::ostream &os) const
+{
+    os << "LeafNode: [";
+    for (int i = 0; i < this->keys.size(); i++)
+    {
+        if (i)
+        {
+            os << ", ";
+        }
+        os << "(" << this->keys[i] << ", " << this->values[i] << ")";
+    }
+    os << "]";
+}
+
+void BPlusTree::InternalNode::output(std::ostream &os) const
+{
+    os << "InternalNode: [";
+    for (int i = 0; i < this->keys.size(); i++)
+    {
+        if (i)
+        {
+            os << ", ";
+        }
+        os << this->keys[i];
+    }
+    os << "]";
+}
+
+size_t BPlusTree::size() const
+{
+    return size_;
+}
+
+void BPlusTree::dumpHelper(Node *node, int indent, std::ostream &os) const
+{
+    os << std::string(indent * 2, ' ');
+    node->output(os);
+    os << '\n';
+
+    if (auto *internal_node = dynamic_cast<InternalNode *>(node))
+    {
+        os << std::string(indent * 2, ' ') << "{\n";
+
+        for (const auto &child : internal_node->children)
+        {
+            dumpHelper(child.get(), indent + 1, os);
+        }
+
+        os << std::string(indent * 2, ' ') << "}\n";
+    }
+}
+
+void BPlusTree::dump(std::ostream &os) const
+{
+    dumpHelper(root.get(), 0, os);
+}
+
+// assume node is not nullptr
+std::pair<int, int> BPlusTree::internalNodeValidator(Node *node, bool isRoot) const
+{
+    assert(node != nullptr && "Null pointer node in tree");
+    assert(std::is_sorted(node->keys.begin(), node->keys.end()) && "Keys not sorted");
+
+    if (auto *leaf_node = dynamic_cast<LeafNode *>(node))
+    {
+        assert(leaf_node->keys.size() == leaf_node->values.size());
+        if (isRoot)
+        {
+            assert(1 <= leaf_node->keys.size() && "Root leaf node has no keys");
+        }
+        else
+        {
+            assert(fanout / 2 <= leaf_node->keys.size());
+        }
+        assert(leaf_node->keys.size() <= fanout);
+
+        return std::make_pair(leaf_node->keys.front(), leaf_node->keys.back());
+    }
+    else if (auto *internal_node = dynamic_cast<InternalNode *>(node))
+    {
+        assert(internal_node->keys.size() + 1 == internal_node->children.size());
+        // the min differs here
+        if (isRoot)
+        {
+            assert(2 <= internal_node->children.size() && "Root internal node has less than two pointers");
+        }
+        else
+        {
+            assert((fanout + 1) / 2 <= internal_node->children.size() && "Non-root internal node has less than ceil(fanout/2) pointers");
+        }
+        assert(internal_node->children.size() <= fanout && "Internal node has more pointers than allowed by fanout");
+
+        // check all the children
+        int min, max;
+        for (int i = 0; i < internal_node->children.size(); i++)
+        {
+            auto [lo, hi] = internalNodeValidator(internal_node->children[i].get(), false);
+
+            if (i == 0)
+            {
+                min = lo;
+            }
+
+            if (i == internal_node->children.size() - 1)
+            {
+                max = hi;
+            }
+
+            if (i)
+            {
+                // if (!(internal_node->keys[i - 1] <= lo))
+                // {
+                //     internal_node->output(std::cout);
+                //     std::cerr << "We broke it: lo = " << lo << " and " << internal_node->keys[i - 1] << " is supposed to be <=" << std::endl;
+                //     dump();
+                // }
+                assert(internal_node->keys[i - 1] <= lo);
+            }
+
+            if (i < internal_node->children.size() - 1)
+            {
+                assert(internal_node->keys[i] > hi);
+            }
+        }
+
+        return std::make_pair(min, max);
+    }
+    unreachable();
+}
+
+void BPlusTree::validate() const
+{
+    if (root == nullptr)
+    {
+        if (size_)
+        {
+            assert(false && "Nonezero size for null root");
+        }
+        return;
+    }
+
+    internalNodeValidator(root.get(), true); // validate the tree structure
+
+    // get the leftmost tree node
+    Node *node = root.get();
+
+    while (auto *internal_node = dynamic_cast<InternalNode *>(node))
+    {
+        node = internal_node->children[0].get();
+    }
+
+    auto *leafNode = dynamic_cast<LeafNode *>(node);
+    assert(leafNode != nullptr);
+
+    int trackedSize = leafNode->keys.size();
+
+    LeafNode *prev = leafNode;
+    LeafNode *cur = leafNode->next;
+
+    while (cur)
+    {
+        trackedSize += cur->keys.size();
+        assert(prev->keys.back() < cur->keys.front());
+        prev = cur;
+        cur = cur->next;
+    }
+
+    assert(size_ == trackedSize);
 }
