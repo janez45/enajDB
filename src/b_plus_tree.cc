@@ -50,6 +50,10 @@ BPlusTree::LeafNode *BPlusTree::search(Node *cur, int key, std::stack<Node *> *s
 // a search is just this with low = high
 std::vector<std::pair<int, int>> BPlusTree::range_query_inclusive(int low, int high) const
 {
+    if (low > high)
+    {
+        throw std::invalid_argument("range must be valid, low <= high");
+    }
     // return empty if B+ tree is empty
     if (empty())
     {
@@ -208,6 +212,7 @@ void BPlusTree::delete_key(int key)
     size_--;
 }
 
+// debugging tools
 void BPlusTree::LeafNode::output(std::ostream &os) const
 {
     os << "LeafNode: [";
@@ -318,12 +323,6 @@ std::pair<int, int> BPlusTree::internalNodeValidator(Node *node, bool isRoot) co
 
             if (i)
             {
-                // if (!(internal_node->keys[i - 1] <= lo))
-                // {
-                //     internal_node->output(std::cout);
-                //     std::cerr << "We broke it: lo = " << lo << " and " << internal_node->keys[i - 1] << " is supposed to be <=" << std::endl;
-                //     dump();
-                // }
                 assert(internal_node->keys[i - 1] <= lo);
             }
 
