@@ -61,7 +61,7 @@ private:
     size_t fanout;
     std::unique_ptr<Node> root;
     bool empty() const;
-    LeafNode *search(Node *cur, int key, std::stack<Node *> *stack = nullptr) const;
+    LeafNode *search(Node *cur, int key, std::stack<std::pair<Node *, int>> *stack = nullptr) const;
     void insert_key_(std::stack<Node *> &stack, int key, int value);
 
     // Precondition: These are used when at capacity + 1. The pointers are already configured
@@ -69,13 +69,16 @@ private:
     SplitResult split_internal_node(InternalNode *internalNode);
     std::pair<int, int> internalNodeValidator(Node *node, bool isRoot) const;
     void dumpHelper(Node *node, int indent, std::ostream &os) const;
+    void stealRightChild(InternalNode *parent, int idx);
+    void stealLeftChild(InternalNode *parent, int idx);
+    void mergeWithRight(InternalNode *parent, int idx);
 
 public:
     explicit BPlusTree(size_t fanout);
 
     std::vector<std::pair<int, int>> range_query_inclusive(int low, int high) const;
     void insert_key(int key, int recordId); // updates if exists, creates if not
-    void delete_key(int key);
+    bool delete_key(int key);               // return false if key does not exist, true if deletion was successful
     size_t size() const;
 
     void validate() const;

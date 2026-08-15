@@ -79,6 +79,8 @@ TEST(BPlusTreeTestInsert, DuplicateKeyShouldFail)
     BPlusTree tree{5};
     EXPECT_NO_THROW(tree.insert_key(1, 1));
     EXPECT_THROW(tree.insert_key(1, 2), std::invalid_argument);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 1); // assert that the size did not change on a fail
 }
 
 TEST(BPlusTreeTestInsert, MultipleInsertion)
@@ -122,8 +124,6 @@ TEST(BPlusTreeTestInsert, MultipleInsertion)
         tree.insert_key(key, val);
         tree.validate();
     }
-
-    tree.dump(std::cerr);
 }
 
 TEST(BPlusTreeTestSearch, SingleSearch)
@@ -135,6 +135,7 @@ TEST(BPlusTreeTestSearch, SingleSearch)
     for (auto [key, val] : data)
     {
         tree.insert_key(key, val);
+        tree.validate();
     }
 
     std::vector<std::pair<int, int>> result = tree.range_query_inclusive(36, 36);
@@ -151,6 +152,7 @@ TEST(BPlusTreeTestSearch, SingleSearchDNE)
     for (auto [key, val] : data)
     {
         tree.insert_key(key, val);
+        tree.validate();
     }
 
     std::vector<std::pair<int, int>> result = tree.range_query_inclusive(51, 51);
@@ -162,6 +164,7 @@ TEST(BPlusTreeTestSearch, RangeSearchBadBounds)
     BPlusTree tree{10};
     tree.insert_key(1, 1);
     EXPECT_THROW(tree.range_query_inclusive(1, 0), std::invalid_argument);
+    tree.validate();
 }
 
 TEST(BPlusTreeTestSearch, RangeSearch)
@@ -178,6 +181,7 @@ TEST(BPlusTreeTestSearch, RangeSearch)
     for (auto [key, val] : data)
     {
         tree.insert_key(key, val);
+        tree.validate();
     }
 
     std::vector<std::pair<int, int>> result = tree.range_query_inclusive(22, 30);
@@ -200,6 +204,7 @@ TEST(BPlusTreeTestSearch, RangeSearchEmpty)
     for (auto [key, val] : data)
     {
         tree.insert_key(key, val);
+        tree.validate();
     }
 
     std::vector<std::pair<int, int>> result = tree.range_query_inclusive(57, 100);
@@ -220,6 +225,7 @@ TEST(BPlusTreeTestSearch, RangeSearchAll)
     for (auto [key, val] : data)
     {
         tree.insert_key(key, val);
+        tree.validate();
     }
     std::vector<std::pair<int, int>> result = tree.range_query_inclusive(1, 50);
     EXPECT_EQ(result, sorted_data);
@@ -239,6 +245,7 @@ TEST(BPlusTreeTestSearch, RangeSearchExceedBounds)
     for (auto [key, val] : data)
     {
         tree.insert_key(key, val);
+        tree.validate();
     }
     std::vector<std::pair<int, int>> result = tree.range_query_inclusive(0, 51);
     EXPECT_EQ(result, sorted_data);
@@ -258,6 +265,7 @@ TEST(BPlusTreeTestSearch, RangeSearchStartsInsideGoesOut)
     for (auto [key, val] : data)
     {
         tree.insert_key(key, val);
+        tree.validate();
     }
     std::vector<std::pair<int, int>> result = tree.range_query_inclusive(27, 100);
     std::vector<std::pair<int, int>> expected(sorted_data.begin() + 26, sorted_data.end());
@@ -278,8 +286,214 @@ TEST(BPlusTreeTestSearch, RangeSearchStartsOutGoesIn)
     for (auto [key, val] : data)
     {
         tree.insert_key(key, val);
+        tree.validate();
     }
     std::vector<std::pair<int, int>> result = tree.range_query_inclusive(-20, 45);
     std::vector<std::pair<int, int>> expected(sorted_data.begin(), sorted_data.begin() + 45);
     EXPECT_EQ(result, expected);
+}
+
+TEST(BPlusTreeTestDelete, DeleteFromEmptyTree)
+{
+    BPlusTree tree{4};
+    for (int i = 0; i < 100; i++)
+    {
+        EXPECT_FALSE(tree.delete_key(i));
+        EXPECT_EQ(tree.size(), 0);
+        tree.validate();
+    }
+}
+
+TEST(BPlusTreeTestDelete, DeleteValueDoesNotExist)
+{
+    BPlusTree tree{5};
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(3, 8);
+    EXPECT_EQ(tree.size(), 4);
+    EXPECT_FALSE(tree.delete_key(4));
+    EXPECT_EQ(tree.size(), 4);
+    tree.validate();
+}
+
+TEST(BPlusTreeTestDelete, SuccessfulDeletionShouldNotAllowSecondDelete)
+{
+    BPlusTree tree{5};
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(3, 8);
+    EXPECT_EQ(tree.size(), 4);
+    EXPECT_TRUE(tree.delete_key(1));
+    EXPECT_EQ(tree.size(), 3);
+    tree.validate();
+    EXPECT_FALSE(tree.delete_key(1));
+    EXPECT_EQ(tree.size(), 3);
+    tree.validate();
+}
+
+TEST(BPlusTreeTestDelete, DeleteSingleRootLeaf)
+{
+    // The root should be nullptr after
+    BPlusTree tree{5};
+    tree.insert_key(1, 6);
+    EXPECT_TRUE(tree.delete_key(1));
+    EXPECT_EQ(tree.size(), 0); // the size should be 0
+    tree.validate();
+    EXPECT_FALSE(tree.delete_key(1));
+    tree.validate();
+    EXPECT_EQ(tree.size(), 0);
+}
+
+TEST(BPlusTreeTestDelete, MultiInsertDeleteSingleFromRootLeaf)
+{
+    BPlusTree tree{5};
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(3, 8);
+    EXPECT_TRUE(tree.delete_key(1));
+    tree.validate();
+}
+
+TEST(BPlusTreeTestDelete, LeafSingleDelete)
+{
+    BPlusTree tree{4};
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(4, 8);
+    tree.insert_key(8, 30);
+    EXPECT_EQ(tree.size(), 5);
+    EXPECT_TRUE(tree.delete_key(4));
+    tree.validate();
+    EXPECT_EQ(tree.size(), 4);
+}
+
+// Leaf node: Correctly steal from left
+TEST(BPlusTreeTestDelete, LeafCorrectlyStealLeft)
+{
+    BPlusTree tree{4};
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(4, 8);
+    tree.insert_key(8, 30);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 5);
+    EXPECT_TRUE(tree.delete_key(7));
+    tree.validate();
+    EXPECT_EQ(tree.size(), 4);
+}
+
+// Leaf node: Correctly steal from right
+TEST(BPlusTreeTestDelete, LeafCorrectlyStealRight)
+{
+    BPlusTree tree{4};
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(4, 8);
+    tree.insert_key(8, 30);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 5);
+    EXPECT_TRUE(tree.delete_key(2));
+    EXPECT_TRUE(tree.delete_key(4));
+    tree.validate();
+    EXPECT_EQ(tree.size(), 3);
+}
+
+// Leaf node: Correctly merge with left sibling
+TEST(BPlusTreeTestDelete, LeafCorrectlyMergeLeft)
+{
+    BPlusTree tree{4};
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(4, 8);
+    tree.insert_key(8, 9);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 5);
+    EXPECT_TRUE(tree.delete_key(4));
+    EXPECT_EQ(tree.size(), 4);
+    tree.validate();
+    EXPECT_TRUE(tree.delete_key(8));
+    EXPECT_EQ(tree.size(), 3);
+    tree.validate();
+}
+
+// Leaf node: Correctly merge with right sibling
+TEST(BPlusTreeTestDelete, LeafCorrectlyMergeRight)
+{
+    BPlusTree tree{4};
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(4, 8);
+    tree.insert_key(8, 9);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 5);
+    EXPECT_TRUE(tree.delete_key(4));
+    EXPECT_EQ(tree.size(), 4);
+    tree.validate();
+    EXPECT_TRUE(tree.delete_key(1));
+    EXPECT_EQ(tree.size(), 3);
+    tree.validate();
+}
+
+// Internal Node: Leaf node propagated up, correctly steal from left and terminate
+TEST(BPlusTreeTestDelete, InternalStealFromLeft)
+{
+    BPlusTree tree{4};
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(4, 8);
+    tree.insert_key(3, 30);
+    tree.insert_key(0, 15);
+    tree.insert_key(-1, 21);
+    tree.insert_key(8, 2);
+    tree.insert_key(9, 5);
+    tree.insert_key(10, 10);
+    tree.insert_key(-2, 40);
+    tree.insert_key(11, 39);
+    tree.validate();
+    tree.dump(std::cout);
+    EXPECT_EQ(tree.size(), 12);
+    EXPECT_TRUE(tree.delete_key(11));
+    tree.validate();
+    EXPECT_EQ(tree.size(), 11);
+
+    EXPECT_TRUE(tree.delete_key(10));
+    tree.validate();
+    EXPECT_EQ(tree.size(), 10);
+
+    tree.dump(std::cout);
+    assert(false);
+}
+
+// Internal Node: Leaf node propagated up, correctly steal from right and terminate
+TEST(BPlusTreeTestDelete, InternalStealFromRight)
+{
+}
+
+// Internal Node: Leaf node propagated up, correctly merge with left sibling
+TEST(BPlusTreeTestDelete, InternalMergeWithLeft)
+{
+}
+
+// Internal node: Leaf node propagated up, correctly merge with right sibling
+TEST(BPlusTreeTestDelete, InternalMergeWithRight)
+{
+}
+
+// Deletion: Propagate all the way up to root, which ends up with the root losing one value
+TEST(BPlusTreeTestDelete, MergeUpToRoot)
+{
+}
+
+// Deletion: Propagate all the way up to root, which ends up getting the root emptied (root originally has only one key). Since that happened, the new merged child is the new root
+TEST(BPlusTreeTestDelete, MergeUpToRootDeleteRoot)
+{
 }
