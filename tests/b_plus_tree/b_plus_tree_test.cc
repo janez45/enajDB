@@ -472,6 +472,7 @@ TEST(BPlusTreeTestDelete, InternalStealFromLeft)
     tree.insert_key(-2, 40);
     tree.insert_key(11, 39);
     tree.validate();
+    tree.dump(std::cout);
     EXPECT_EQ(tree.size(), 12);
     EXPECT_TRUE(tree.delete_key(11));
     tree.validate();
@@ -480,6 +481,7 @@ TEST(BPlusTreeTestDelete, InternalStealFromLeft)
     EXPECT_TRUE(tree.delete_key(10));
     tree.validate();
     EXPECT_EQ(tree.size(), 10);
+    tree.dump(std::cout);
 }
 
 // Internal Node: Leaf node propagated up, correctly steal from right and terminate
@@ -525,11 +527,81 @@ TEST(BPlusTreeTestDelete, InternalStealFromRight)
 // Internal Node: Leaf node propagated up, correctly merge with left sibling
 TEST(BPlusTreeTestDelete, InternalMergeWithLeft)
 {
+    BPlusTree tree{4};
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(4, 8);
+    tree.insert_key(3, 30);
+    tree.insert_key(0, 15);
+    tree.insert_key(-1, 21);
+    tree.insert_key(8, 2);
+    tree.insert_key(9, 5);
+    tree.insert_key(10, 10);
+    tree.insert_key(-2, 40);
+    tree.insert_key(11, 39);
+    tree.validate();
+    tree.dump(std::cout);
+    EXPECT_EQ(tree.size(), 12);
+
+    tree.delete_key(4);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 11);
+
+    tree.delete_key(3);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 10);
+
+    tree.delete_key(7);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 9);
+
+    tree.delete_key(8);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 8);
+
+    tree.dump(std::cout);
 }
 
 // Internal node: Leaf node propagated up, correctly merge with right sibling
 TEST(BPlusTreeTestDelete, InternalMergeWithRight)
 {
+    BPlusTree tree{4};
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(4, 8);
+    tree.insert_key(3, 30);
+    tree.insert_key(0, 15);
+    tree.insert_key(-1, 21);
+    tree.insert_key(8, 2);
+    tree.insert_key(9, 5);
+    tree.insert_key(10, 10);
+    tree.insert_key(-2, 40);
+    tree.insert_key(11, 39);
+    tree.validate();
+    tree.dump(std::cout);
+    EXPECT_EQ(tree.size(), 12);
+
+    tree.delete_key(4);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 11);
+
+    tree.delete_key(3);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 10);
+
+    // this is when it becomes symmetrical, useful for next part
+
+    tree.delete_key(-2);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 9);
+
+    tree.delete_key(-1);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 8);
+
+    tree.dump(std::cout);
 }
 
 // Deletion: Propagate all the way up to root, which ends up with the root losing one value
