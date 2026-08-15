@@ -459,7 +459,6 @@ TEST(BPlusTreeTestDelete, InternalStealFromLeft)
     tree.insert_key(-2, 40);
     tree.insert_key(11, 39);
     tree.validate();
-    tree.dump(std::cout);
     EXPECT_EQ(tree.size(), 12);
     EXPECT_TRUE(tree.delete_key(11));
     tree.validate();
@@ -468,14 +467,46 @@ TEST(BPlusTreeTestDelete, InternalStealFromLeft)
     EXPECT_TRUE(tree.delete_key(10));
     tree.validate();
     EXPECT_EQ(tree.size(), 10);
-
-    tree.dump(std::cout);
-    assert(false);
 }
 
 // Internal Node: Leaf node propagated up, correctly steal from right and terminate
 TEST(BPlusTreeTestDelete, InternalStealFromRight)
 {
+    BPlusTree tree{4};
+
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(4, 8);
+    tree.insert_key(3, 30);
+    tree.insert_key(0, 15);
+    tree.insert_key(-1, 21);
+    tree.insert_key(8, 2);
+    tree.insert_key(9, 5);
+    tree.insert_key(10, 10);
+    tree.insert_key(-2, 40);
+    tree.insert_key(11, 39);
+    tree.insert_key(12, 12);
+    tree.insert_key(13, 12);
+
+    tree.validate();
+    EXPECT_EQ(tree.size(), 14);
+
+    EXPECT_TRUE(tree.delete_key(-2));
+    EXPECT_EQ(tree.size(), 13);
+    tree.validate();
+
+    EXPECT_TRUE(tree.delete_key(-1));
+    EXPECT_EQ(tree.size(), 12);
+    tree.validate();
+
+    EXPECT_TRUE(tree.delete_key(3));
+    EXPECT_EQ(tree.size(), 11);
+    tree.validate();
+
+    EXPECT_TRUE(tree.delete_key(2));
+    EXPECT_EQ(tree.size(), 10);
+    tree.validate();
 }
 
 // Internal Node: Leaf node propagated up, correctly merge with left sibling

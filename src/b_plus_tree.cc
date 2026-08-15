@@ -228,9 +228,9 @@ void BPlusTree::stealRightChild(InternalNode *parent, int idx)
         int parent_sep = parent->keys[idx];
         internal_node->keys.push_back(parent_sep);
         internal_node->children.push_back(std::move(right->children[0]));
+        parent->keys[idx] = right->keys[0];
         right->keys.erase(right->keys.begin());
         right->children.erase(right->children.begin());
-        parent->keys[idx] = right->keys[0];
         return;
     }
     unreachable();
@@ -298,8 +298,6 @@ void BPlusTree::mergeWithRight(InternalNode *parent, int idx)
 
 bool BPlusTree::delete_key(int key)
 {
-    std::cout << "Before deleting " << key << ":";
-    dump(std::cout);
     std::stack<std::pair<Node *, int>> stack; // top should be leafnode, rest internal
     BPlusTree::LeafNode *targetLeaf = search(root.get(), key, &stack);
 
@@ -396,9 +394,6 @@ bool BPlusTree::delete_key(int key)
             mergeWithRight(parent, idx - 1);
         }
 
-        std::cout << "Intermediate tree:" << std::endl;
-        dump(std::cout);
-
         // check if the parent is valid TODO what if it's the root?
         if ((fanout + 1) / 2 <= parent->children.size())
         {
@@ -413,8 +408,7 @@ bool BPlusTree::delete_key(int key)
     {
         root = std::move(static_cast<InternalNode *>(cur)->children[0]);
     }
-    std::cout << "After deletion:" << std::endl;
-    dump(std::cout);
+
     return true;
 }
 
