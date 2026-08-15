@@ -2,6 +2,8 @@
 #include "b_plus_tree.h"
 #include <iostream>
 #include <algorithm>
+#include <numeric>
+#include <random>
 
 TEST(BPlusTreeTest, DisallowFanoutLessThan3)
 {
@@ -648,4 +650,70 @@ TEST(BPlusTreeTestDelete, MergeUpToRootDeleteRoot)
     tree.validate();
     EXPECT_EQ(tree.size(), 3);
     tree.dump(std::cout);
+}
+
+TEST(BPlusTreeTestDelete, DeleteEverything)
+{
+    BPlusTree tree{4};
+
+    for (int i = 0; i < 100; i++)
+    {
+        ASSERT_TRUE(tree.insert_key(i, i));
+    }
+
+    tree.validate();
+
+    for (int i = 0; i < 100; i++)
+    {
+        ASSERT_TRUE(tree.delete_key(i));
+        tree.validate();
+        EXPECT_EQ(tree.size(), 99 - i);
+    }
+
+    EXPECT_EQ(tree.size(), 0);
+}
+
+TEST(BPlusTreeTestDelete, SuperDeepRandomizedTree)
+{
+    BPlusTree tree{100};
+
+    int size = 100000;
+
+    std::vector<int> a(size);
+    std::vector<int> b(size);
+
+    std::iota(a.begin(), a.end(), 0);
+    std::iota(b.begin(), b.end(), 0);
+
+    std::mt19937 rng(12345);
+
+    std::shuffle(a.begin(), a.end(), rng);
+    std::shuffle(b.begin(), b.end(), rng);
+
+    for (auto i : a)
+    {
+        EXPECT_TRUE(tree.insert_key(i, i));
+        if (i < 100 || i % 1000 == 0)
+        {
+            tree.validate();
+        }
+    }
+
+    tree.validate();
+
+    for (int j = 0; j < b.size(); ++j)
+    {
+        int i = b[j];
+
+        EXPECT_TRUE(tree.delete_key(i));
+
+        if (j < 100 || j % 1000 == 0)
+        {
+            tree.validate();
+        }
+
+        EXPECT_EQ(tree.size(), size - 1 - j);
+    }
+
+    EXPECT_EQ(tree.size(), 0);
 }
