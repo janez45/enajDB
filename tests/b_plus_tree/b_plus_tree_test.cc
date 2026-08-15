@@ -77,10 +77,23 @@ TEST(BPlusTreeTestInsert, TestSplitUpToRoot)
 TEST(BPlusTreeTestInsert, DuplicateKeyShouldFail)
 {
     BPlusTree tree{5};
-    EXPECT_NO_THROW(tree.insert_key(1, 1));
-    EXPECT_THROW(tree.insert_key(1, 2), std::invalid_argument);
+    EXPECT_TRUE(tree.insert_key(1, 1));
+    EXPECT_FALSE(tree.insert_key(1, 2));
     tree.validate();
     EXPECT_EQ(tree.size(), 1); // assert that the size did not change on a fail
+}
+
+TEST(BPlusTreeTestInsert, Idempotency)
+{
+    BPlusTree tree{5};
+    EXPECT_TRUE(tree.insert_key(1, 1));
+
+    for (int i = 0; i < 100; i++)
+    {
+        EXPECT_FALSE(tree.insert_key(1, 2));
+        tree.validate();
+        EXPECT_EQ(tree.size(), 1); // assert that the size did not change on a fail
+    }
 }
 
 TEST(BPlusTreeTestInsert, MultipleInsertion)
@@ -522,9 +535,45 @@ TEST(BPlusTreeTestDelete, InternalMergeWithRight)
 // Deletion: Propagate all the way up to root, which ends up with the root losing one value
 TEST(BPlusTreeTestDelete, MergeUpToRoot)
 {
+    BPlusTree tree{4};
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(4, 8);
+    tree.insert_key(3, 30);
+    tree.insert_key(8, 8);
+    tree.insert_key(9, 9);
+    tree.validate();
+    tree.dump(std::cout);
+    EXPECT_EQ(tree.size(), 7);
+
+    tree.delete_key(1);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 6);
+
+    tree.dump(std::cout);
 }
 
 // Deletion: Propagate all the way up to root, which ends up getting the root emptied (root originally has only one key). Since that happened, the new merged child is the new root
 TEST(BPlusTreeTestDelete, MergeUpToRootDeleteRoot)
 {
+    BPlusTree tree{4};
+
+    tree.insert_key(1, 6);
+    tree.insert_key(2, 1);
+    tree.insert_key(7, 23);
+    tree.insert_key(4, 8);
+    tree.insert_key(3, 30);
+    tree.validate();
+    tree.dump(std::cout);
+    EXPECT_EQ(tree.size(), 5);
+
+    tree.delete_key(3);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 4);
+
+    tree.delete_key(4);
+    tree.validate();
+    EXPECT_EQ(tree.size(), 3);
+    tree.dump(std::cout);
 }

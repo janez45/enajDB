@@ -77,7 +77,7 @@ public:
     explicit BPlusTree(size_t fanout);
 
     std::vector<std::pair<int, int>> range_query_inclusive(int low, int high) const;
-    void insert_key(int key, int recordId); // updates if exists, creates if not
+    bool insert_key(int key, int recordId); // disallows duplicates, false if it exists
     bool delete_key(int key);               // return false if key does not exist, true if deletion was successful
     size_t size() const;
 

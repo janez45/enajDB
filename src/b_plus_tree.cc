@@ -125,7 +125,7 @@ BPlusTree::SplitResult BPlusTree::split_internal_node(InternalNode *internalNode
 
 // TODO: Keys are unique for now.
 // If you try to hit a key that already exists, it throws an error
-void BPlusTree::insert_key(int key, int recordId)
+bool BPlusTree::insert_key(int key, int recordId)
 {
     std::stack<std::pair<Node *, int>> stack; // top should be leafnode, rest internal
     BPlusTree::LeafNode *targetLeaf = search(root.get(), key, &stack);
@@ -136,7 +136,7 @@ void BPlusTree::insert_key(int key, int recordId)
         auto it = std::lower_bound(targetLeaf->keys.begin(), targetLeaf->keys.end(), key);
         if (it != targetLeaf->keys.end() && *it == key)
         {
-            throw std::invalid_argument(std::format("Cannot insert duplicate key: {}", key));
+            return false;
         }
     }
     size_++;
@@ -148,7 +148,7 @@ void BPlusTree::insert_key(int key, int recordId)
         newRoot->keys = {key};
         newRoot->values = {recordId};
         root = std::move(newRoot);
-        return;
+        return true;
     }
 
     /*
@@ -205,6 +205,8 @@ void BPlusTree::insert_key(int key, int recordId)
         newRoot->children.push_back(std::move(splitResult.right));
         root = std::move(newRoot);
     }
+
+    return true;
 }
 
 // assume that parameters are valid. So idx isn't the parent's final child
